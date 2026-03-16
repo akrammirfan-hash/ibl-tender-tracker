@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IBL Healthcare · MSD Tender Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#EEF2F7;--card:#fff;--raised:#F5F8FC;--border:#D8E3EE;
+  --teal:#0090A0;--teal-d:rgba(0,144,160,.09);--teal-g:rgba(0,144,160,.22);
+  --red:#DC2626;--red-d:rgba(220,38,38,.09);
+  --amber:#B45309;--amber-d:rgba(180,83,9,.09);
+  --green:#15803D;--green-d:rgba(21,128,61,.09);
+  --blue:#1D4ED8;--blue-d:rgba(29,78,216,.09);
+  --t1:#0D1B2A;--t2:#344F6A;--t3:#7D96B0;
+  --sh:0 1px 4px rgba(0,0,0,.07);--shm:0 2px 10px rgba(0,0,0,.08);
+  --fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'JetBrains Mono',monospace;
+  --r:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);min-height:100vh;font-family:var(--fb);color:var(--t1);}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle,rgba(0,144,160,.05) 1px,transparent 1px);
+  background-size:26px 26px;}
+#app{position:relative;z-index:1;min-height:100vh;}
+
+/* ── HEADER ── */
+.hdr{background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--sh);
+  padding:0 28px;position:sticky;top:0;z-index:100;}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;
+  padding:15px 0 11px;gap:14px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-logo{width:41px;height:41px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal) 0%,#007A88 100%);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 2px 10px var(--teal-g);}
+.brand-name{font-family:var(--fh);font-size:15px;font-weight:800;color:var(--t1);letter-spacing:-.3px;}
+.brand-sub{font-family:var(--fm);font-size:10px;color:var(--t3);margin-top:2px;letter-spacing:.5px;}
+.live-row{display:flex;align-items:center;gap:8px;padding:6px 13px;border-radius:99px;
+  background:var(--raised);border:1px solid var(--border);font-size:11px;color:var(--t2);
+  font-family:var(--fm);flex-wrap:wrap;}
+.ldot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.ldot.ok{background:var(--green);box-shadow:0 0 6px rgba(21,128,61,.5);animation:blink 2.5s infinite;}
+.ldot.spin{background:var(--amber);animation:blink .8s infinite;}
+.ldot.err{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.rfbtn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:#fff;
+  font-size:10px;color:var(--t2);cursor:pointer;font-family:var(--fm);transition:all .15s;}
+.rfbtn:hover{border-color:var(--teal);color:var(--teal);}
+.dtabs{display:flex;border-top:1px solid var(--border);overflow-x:auto;}
+.dtab{padding:10px 17px;font-size:12px;font-weight:600;border:none;cursor:pointer;
+  background:transparent;color:var(--t3);border-bottom:2.5px solid transparent;
+  transition:all .15s;font-family:var(--fb);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.dtab.on{color:var(--teal);border-bottom-color:var(--teal);}
+.dtab:hover:not(.on){color:var(--t2);background:var(--teal-d);}
+.tpill{padding:1px 6px;border-radius:99px;font-size:10px;font-family:var(--fm);font-weight:600;}
+.ddot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* ── ALERT BAR ── */
+.abar{background:#FFFBF4;border-bottom:1px solid #FDE8C0;padding:9px 28px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.achip{display:flex;align-items:center;gap:7px;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;}
+.achip.c{background:#FEF2F2;color:#991B1B;border:1px solid #FECACA;}
+.achip.w{background:#FFFBEB;color:#78350F;border:1px solid #FDE68A;}
+.pls{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.pls.r{background:var(--red);animation:blink 1.4s infinite;}
+.pls.a{background:var(--amber);}
+.alink{margin-left:auto;padding:5px 11px;border-radius:5px;border:1px solid var(--border);
+  background:#fff;font-size:11px;font-weight:600;color:var(--t2);cursor:pointer;transition:all .15s;}
+.alink:hover{border-color:var(--teal);color:var(--teal);}
+
+/* ── BODY ── */
+.body{padding:22px 28px;}
+
+/* ── KPI ── */
+.krow{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:11px;margin-bottom:20px;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;box-shadow:var(--sh);position:relative;overflow:hidden;}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0;}
+.kpi.teal::after{background:var(--teal)}.kpi.amber::after{background:var(--amber)}
+.kpi.blue::after{background:var(--blue)}.kpi.green::after{background:var(--green)}
+.kico{position:absolute;right:13px;top:13px;font-size:17px;opacity:.22;}
+.kv{font-family:var(--fm);font-size:22px;font-weight:600;line-height:1;margin-bottom:4px;}
+.kv.teal{color:var(--teal)}.kv.amber{color:var(--amber)}.kv.blue{color:var(--blue)}.kv.green{color:var(--green)}
+.kl{font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.5px;}
+.ks{font-size:10px;color:var(--t3);margin-top:3px;font-family:var(--fm);}
+
+/* ── TOOLBAR ── */
+.tbar{display:flex;gap:9px;margin-bottom:13px;flex-wrap:wrap;align-items:center;}
+.srch{flex:1;min-width:200px;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:8px 13px;font-size:12px;color:var(--t1);font-family:var(--fb);
+  outline:none;box-shadow:var(--sh);transition:border-color .2s;}
+.srch:focus{border-color:var(--teal);}
+.srch::placeholder{color:var(--t3);}
+.sfwrap{display:flex;gap:5px;flex-wrap:wrap;}
+.sf{padding:6px 11px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);color:var(--t2);
+  transition:all .15s;font-family:var(--fb);white-space:nowrap;box-shadow:var(--sh);}
+.sf.on{background:var(--teal);color:#fff;border-color:var(--teal);}
+.sf:hover:not(.on){border-color:var(--teal);color:var(--teal);}
+
+/* ── TABLE ── */
+.twrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shm);}
+.tcap{padding:10px 17px;background:var(--raised);border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
+.tcl{font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.4px;}
+.tcr{font-size:10px;color:var(--t3);font-family:var(--fm);}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;min-width:800px;}
+thead th{padding:9px 13px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);
+  letter-spacing:.8px;background:#EEF2F7;border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;white-space:nowrap;}
+thead th.r{text-align:right;}
+thead th:hover{color:var(--t2);}
+tbody tr{border-left:3px solid transparent;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#EFF6FF;}
+tbody tr.xp{background:#EAF4F6;}
+tbody tr.cr{border-left-color:var(--red);}
+tbody tr.wa{border-left-color:var(--amber);}
+td{padding:10px 13px;font-size:12px;color:var(--t1);vertical-align:middle;}
+.tid{font-family:var(--fm);font-size:10.5px;color:var(--t2);display:flex;align-items:center;gap:5px;}
+.tinst{font-weight:600;font-size:12px;}
+.tdiv{font-size:10px;color:var(--t3);margin-top:1px;}
+.tval{font-family:var(--fm);font-size:12px;font-weight:600;color:var(--teal);text-align:right;}
+.tvsub{font-size:9px;color:var(--t3);font-family:var(--fm);text-align:right;margin-top:1px;}
+.earr{font-size:9px;color:var(--t3);transition:transform .2s;display:inline-block;}
+.earr.op{transform:rotate(90deg);color:var(--teal);}
+
+/* ── BADGES ── */
+.badge{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.4px;white-space:nowrap;display:inline-block;}
+.badge.cmp{background:var(--green-d);color:var(--green);}
+.badge.pp{background:var(--blue-d);color:var(--blue);}
+.badge.sp{background:var(--amber-d);color:var(--amber);}
+.badge.pop{background:var(--teal-d);color:var(--teal);}
+.badge.awd{background:rgba(0,144,160,.07);color:#007A88;}
+.badge.na{background:var(--raised);color:var(--t3);border:1px solid var(--border);}
+.badge.df{background:var(--red-d);color:var(--red);}
+.badge.ev{background:var(--blue-d);color:var(--blue);}
+.badge.bi{background:rgba(29,78,216,.07);color:var(--blue);}
+
+/* ── MILESTONES ── */
+.ms{min-width:260px;}
+.mstr{display:flex;align-items:flex-start;}
+.msst{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.msd{width:19px;height:19px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;}
+.msd.dn{background:var(--teal);color:#fff;box-shadow:0 0 5px var(--teal-g);}
+.msd.fl{background:var(--amber);color:#fff;}
+.msd.ct{background:var(--red);color:#fff;}
+.msd.sk{background:var(--border);color:var(--t3);}
+.msd.id{background:var(--raised);color:var(--t3);border:1.5px solid var(--border);}
+.mslb{font-size:7px;color:var(--t3);text-align:center;white-space:pre;line-height:1.2;max-width:32px;}
+.mscn{height:2px;width:12px;flex-shrink:0;margin-bottom:14px;}
+.mscn.dn{background:var(--teal);}.mscn.id{background:var(--border);}
+.msprog{display:flex;align-items:center;gap:5px;margin-top:5px;}
+.msbar{flex:1;height:3px;background:var(--border);border-radius:99px;overflow:hidden;}
+.msfill{height:100%;border-radius:99px;}
+.mspct{font-family:var(--fm);font-size:9px;color:var(--t3);min-width:26px;text-align:right;}
+
+/* ── ALERT DOTS ── */
+.adts{display:flex;flex-direction:column;gap:3px;align-items:center;min-width:18px;}
+.adt{width:7px;height:7px;border-radius:50%;}
+.adt.c{background:var(--red);}.adt.w{background:var(--amber);}
+
+/* ── DETAIL PANEL ── */
+.dp-inner{padding:15px 17px 18px 32px;background:#F4F8FB;border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;}
+.dtt{font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+.dr{display:flex;gap:8px;margin-bottom:4px;}
+.dl{font-size:10px;color:var(--t3);min-width:105px;flex-shrink:0;}
+.dv{font-size:11px;color:var(--t2);font-weight:500;}
+.dv.hi{color:var(--teal);font-family:var(--fm);}
+.alr{display:flex;gap:6px;margin-bottom:5px;align-items:flex-start;}
+.ald{width:6px;height:6px;border-radius:50%;margin-top:3px;flex-shrink:0;}
+.alt{font-size:11px;line-height:1.4;}
+.alt.c{color:#991B1B;}.alt.w{color:#78350F;}.alt.i{color:var(--t2);}
+.pprod{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--border);
+  border-radius:4px;padding:3px 7px;margin:2px;font-size:10px;color:var(--t2);}
+.ppq{color:var(--teal);font-family:var(--fm);font-size:9px;}
+
+/* ── DIVISION CARDS ── */
+.dcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px;margin-top:20px;}
+.dc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:17px 19px;box-shadow:var(--sh);position:relative;overflow:hidden;}
+.dcn{font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:2px;}
+.dcc{font-family:var(--fm);font-size:10px;color:var(--t3);margin-bottom:9px;}
+.dcv{font-family:var(--fm);font-size:19px;font-weight:600;}
+.dcvs{font-size:10px;color:var(--t3);margin-bottom:11px;}
+.dcst{display:flex;gap:16px;margin-bottom:11px;}
+.dcs-v{font-family:var(--fm);font-size:16px;font-weight:600;}
+.dcs-l{font-size:9px;color:var(--t3);}
+.dcpb{height:4px;border-radius:99px;background:var(--border);overflow:hidden;margin-bottom:4px;}
+.dcpf{height:100%;border-radius:99px;}
+.dcr{font-size:9px;color:var(--t3);font-family:var(--fm);}
+
+/* ── LOADING / ERROR ── */
+.center-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 20px;text-align:center;min-height:70vh;}
+.ci{font-size:48px;margin-bottom:16px;animation:bob .9s ease-in-out infinite alternate;}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+.ct{font-family:var(--fh);font-size:20px;font-weight:700;color:var(--t2);margin-bottom:8px;}
+.cs{font-size:13px;color:var(--t3);max-width:360px;line-height:1.6;}
+.lbar{width:220px;height:3px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:20px;}
+.lfill{height:100%;background:var(--teal);border-radius:99px;animation:ld 1.2s ease-in-out infinite;}
+@keyframes ld{0%{width:0%}50%{width:70%}100%{width:100%}}
+.ebtn{padding:10px 24px;background:var(--teal);color:#fff;border:none;border-radius:8px;
+  font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fh);margin-top:20px;transition:opacity .2s;}
+.ebtn:hover{opacity:.85;}
+
+/* ── MISC ── */
+.norows td{padding:36px;text-align:center;font-size:13px;color:var(--t3);}
+.footer{margin-top:26px;padding:13px 0;border-top:1px solid var(--border);
+  font-size:10px;color:var(--t3);text-align:center;font-family:var(--fm);}
+@media(max-width:768px){
+  .hdr,.body,.abar{padding-left:14px;padding-right:14px;}
+  .mslb{display:none;}.mscn{width:8px;}.ms{min-width:180px;}
+  .body{padding:14px;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   CONFIG — Your 3 Google Sheets CSV URLs
+═══════════════════════════════════════════════════ */
+const SHEETS = [
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=1526619916&single=true&output=csv",
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=286795890&single=true&output=csv",
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=634235353&single=true&output=csv"
+];
+const REFRESH_MS = 5 * 60 * 1000;
+const DC = { Hospicare:"#0090A0", "Critical Care":"#1D4ED8", "Medical Care":"#B45309" };
+
+/* ═══════════════════════════════════════════════════
+   PARSING UTILITIES
+═══════════════════════════════════════════════════ */
+const cl  = v => (v===null||v===undefined) ? "" : String(v).replace(/\xa0/g," ").trim();
+const isR = v => { const s=cl(v).toLowerCase().replace(/\s/g,""); return s!==""&&s!=="-"&&s!=="—"&&s!=="awaited"&&s!=="noidea"&&s!=="n/a"&&!s.startsWith("90days"); };
+const yn  = v => { const s=cl(v).toLowerCase(); return s==="yes"||s==="y"||s==="done"; };
+const toN = v => { const n=parseFloat(String(v||"").replace(/,/g,"")); return isNaN(n)?null:n; };
+const fP  = n => { if(!n||isNaN(n)||n<=0)return null; if(n>=1e9)return`${(n/1e9).toFixed(2)}B`; if(n>=1e6)return`${(n/1e6).toFixed(1)}M`; if(n>=1e3)return`${Math.round(n/1e3)}K`; return Math.round(n).toLocaleString(); };
+const divOf = id => { const s=String(id||"").toUpperCase().trim(); if(s.startsWith("HC"))return"Hospicare"; if(s.startsWith("CC"))return"Critical Care"; if(s.startsWith("MC"))return"Medical Care"; return"Other"; };
+
+const HDR = {
+  "tender id":"id","tenderid":"id","tender name":"nm","tendername":"nm","institution":"inst",
+  "bid submitted (y/n)":"bs","bidsubmitted(y/n)":"bs","bid amount":"ba","bidamount":"ba",
+  "contract awarded (y/n)":"aw","contractawarded(y/n)":"aw","tenderstatus":"ts","tender status":"ts",
+  "notes":"nt","po number":"pn","po generation date":"pd","supplies due date":"sd","suppliesduedate":"sd",
+  "supplies delivered (y/n)":"sdl","suppliesdelivered(y/n)":"sdl",
+  "suppliesdelivereddate / dn acknowledgement date":"sdd",
+  "dtl date  / test opening date":"dtl","dtl date / test opening date":"dtl",
+  "quantity":"qty","products":"pr","unit rate":"ur","po value":"pv","contract value":"cv","contractvalue":"cv",
+  "payment terms days":"pt","paymenttermsdays":"pt","lc/bcissued (y/n)":"lc","lc/bcissued(y/n)":"lc",
+  "lc/bc expiry date":"le","lc/bcexpirydate":"le","payment expected date":"pe","paymentexpecteddate":"pe",
+  "payment received date":"pr2","paymentreceiveddate":"pr2","status":"st",
+  "remarks from concerned business":"rm"
+};
+
+function bfm(hdr){
+  const m={};
+  hdr.forEach((h,i)=>{const k=String(h||"").trim().toLowerCase().replace(/\s+/g," ");const c=HDR[k];if(c&&!(c in m))m[c]=i;});
+  return (row,f)=>f in m?cl(row[m[f]]):"";
+}
+
+function parseRows(rows){
+  if(!rows||rows.length<2)return[];
+  const g=bfm(rows[0]); const res=[]; let cur=null;
+  for(let i=1;i<rows.length;i++){
+    const row=rows[i];
+    if(!row||row.every(v=>!cl(v)))continue;
+    const rid=g(row,"id"); const hasId=rid&&isR(rid);
+    if(hasId){
+      if(cur)res.push(fin(cur));
+      const ts=g(row,"ts"),tsl=ts.toLowerCase(),nt=g(row,"nt").toLowerCase(),rm=g(row,"rm").toLowerCase();
+      const aw=g(row,"aw");
+      const isAw=yn(aw)||tsl.includes("finalized")||tsl.includes("award")||tsl.includes("supply scheduled");
+      const notAw=!yn(aw)&&(nt.includes("n/award")||nt.includes("higher price")||nt.includes("enduser rejection")||tsl.includes("not final"));
+      const pn=g(row,"pn"), pg=isR(pn)&&!["awaited","in process","contract awaited"].includes(pn.toLowerCase());
+      const sdl=yn(g(row,"sdl")), dtlr=g(row,"dtl").toLowerCase();
+      const dtlF=dtlr.includes("fail")||dtlr.includes("mis brand");
+      const dtlD=isR(dtlr)&&!dtlr.includes("wait")&&!dtlr.includes("pending")&&!dtlF;
+      const pr2=g(row,"pr2"), payR=isR(pr2)&&!["no idea","this month","after dtl"].some(x=>pr2.toLowerCase().includes(x));
+      const pv=toN(g(row,"pv")),cv=toN(g(row,"cv")),ba=toN(g(row,"ba"));
+      cur={id:rid,div:divOf(rid),ts,tsl,nt,rm,inst:g(row,"inst"),nm:g(row,"nm"),
+        isAw,notAw,pg,pn,pd:g(row,"pd"),sdl,sd:g(row,"sd"),sdd:g(row,"sdd"),
+        dtlD,dtlF,dtlr,lc:yn(g(row,"lc")),le:g(row,"le"),
+        payR,pe:g(row,"pe"),pr2,ba,cv,pv,tpv:pv||0,pt:g(row,"pt"),st:g(row,"st"),prods:[],alerts:[]};
+      const p=g(row,"pr"),q=g(row,"qty"),u=toN(g(row,"ur"));
+      if(p||q)cur.prods.push({product:p,qty:q,ur:u});
+    } else if(cur){
+      const p=g(row,"pr")||g(row,"inst"),q=g(row,"qty"),u=toN(g(row,"ur")),pv2=toN(g(row,"pv")),cv2=toN(g(row,"cv"));
+      if(p||q)cur.prods.push({product:p,qty:q,ur:u});
+      if(pv2>0)cur.tpv+=pv2;
+      if(cv2&&!cur.cv)cur.cv=cv2;
+    }
+  }
+  if(cur)res.push(fin(cur));
+  return res;
+}
+
+function fin(t){
+  const a=[];
+  if(t.dtlF)a.push({s:"c",m:"DTL / quality test FAILED — immediate action required"});
+  if(t.isAw&&!t.notAw&&!t.pg)a.push({s:"c",m:"Contract awarded but PO not yet received"});
+  if(t.pg&&!t.sdl)a.push({s:"w",m:"PO issued — supplies not yet delivered"});
+  if(t.sdl&&!t.payR)a.push({s:"w",m:"Supplies delivered — payment still outstanding"});
+  if(t.rm.includes("waiting for payment")&&!t.payR)a.push({s:"w",m:"Awaiting payment clearance from institution"});
+  if(t.rm.includes("waiting for po")||t.rm.includes("waiting for award"))a.push({s:"w",m:"Awaiting PO / award letter"});
+  if(t.rm.includes("dtl")&&!t.dtlF&&!t.dtlD)a.push({s:"i",m:"DTL test result still pending"});
+  if(t.rm.includes("half remaining")||t.rm.includes("remaining"))a.push({s:"w",m:"Partial delivery — remaining stock pending"});
+  if(t.tsl.includes("not final"))a.push({s:"i",m:"Tender evaluation not yet finalized"});
+  return {...t,alerts:a};
+}
+
+/* ═══════════════════════════════════════════════════
+   STATE & APP
+═══════════════════════════════════════════════════ */
+let STATE = {
+  tenders: [], loadState: "loading", err: "",
+  lastFetch: null, countdown: REFRESH_MS/1000,
+  activeDiv: "All", activeSt: "All", search: "",
+  expanded: {}, sortF: "id", sortDir: "asc"
+};
+let refreshTimer=null, countdownTimer=null;
+
+function setState(patch){
+  STATE = {...STATE,...patch};
+  render();
+}
+
+/* ═══════════════════════════════════════════════════
+   FETCH
+═══════════════════════════════════════════════════ */
+async function fetchAll(){
+  if(STATE.loadState!=="ready") setState({loadState:"loading"});
+  try{
+    const results = await Promise.all(SHEETS.map(url =>
+      fetch(url)
+        .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+        .then(csv=>{ const p=Papa.parse(csv,{skipEmptyLines:true}); return parseRows(p.data); })
+    ));
+    const all = results.flat();
+    setState({tenders:all, loadState:"ready", lastFetch:new Date(), countdown:REFRESH_MS/1000});
+  } catch(e){
+    setState({err:e.message||"Network error", loadState: STATE.tenders.length>0?"ready":"error"});
+  }
+}
+
+function startTimers(){
+  clearInterval(refreshTimer); clearInterval(countdownTimer);
+  refreshTimer = setInterval(()=>{ fetchAll(); }, REFRESH_MS);
+  countdownTimer = setInterval(()=>{
+    STATE = {...STATE, countdown: STATE.countdown<=1 ? REFRESH_MS/1000 : STATE.countdown-1};
+    const el=document.getElementById("cd");
+    if(el){ const s=STATE.countdown; el.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}` }
+  },1000);
+}
+
+/* ═══════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════ */
+const fmtT = d => d ? d.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "—";
+const fmtC = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const esc  = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function getFiltered(){
+  const {tenders,activeDiv,activeSt,search,sortF,sortDir}=STATE;
+  const q=search.toLowerCase();
+  const STF = {
+    "All":()=>true,
+    "🔴 Alerts":t=>t.alerts.some(a=>a.s==="c"||a.s==="w"),
+    "Awarded":t=>t.isAw&&!t.notAw,
+    "PO Pending":t=>t.isAw&&!t.notAw&&!t.pg,
+    "Supply Pend":t=>t.pg&&!t.sdl,
+    "Pay Pending":t=>t.sdl&&!t.payR,
+    "Completed":t=>t.payR,
+    "Not Awarded":t=>t.notAw
+  };
+  return tenders
+    .filter(t=>activeDiv==="All"||t.div===activeDiv)
+    .filter(t=>STF[activeSt]?.(t)??true)
+    .filter(t=>!q||[t.id,t.inst,t.ts,t.div].some(f=>String(f||"").toLowerCase().includes(q)))
+    .sort((a,b)=>{
+      let va=a[sortF]??"",vb=b[sortF]??"";
+      if(typeof va==="number"&&typeof vb==="number") return sortDir==="asc"?va-vb:vb-va;
+      va=String(va).toLowerCase(); vb=String(vb).toLowerCase();
+      return sortDir==="asc"?va.localeCompare(vb):vb.localeCompare(va);
+    });
+}
+
+function getKpis(){
+  const t=STATE.tenders;
+  return {
+    total:t.length,
+    awarded:t.filter(x=>x.isAw&&!x.notAw).length,
+    poPend:t.filter(x=>x.isAw&&!x.notAw&&!x.pg).length,
+    supPend:t.filter(x=>x.pg&&!x.sdl).length,
+    payPend:t.filter(x=>x.sdl&&!x.payR).length,
+    complete:t.filter(x=>x.payR).length,
+    pipe:t.reduce((s,x)=>s+(x.cv||x.ba||0),0),
+    critC:t.filter(x=>x.alerts.some(a=>a.s==="c")).length,
+    warnC:t.filter(x=>x.alerts.some(a=>a.s==="w")).length
+  };
+}
+
+function getDivCounts(){
+  const c={All:STATE.tenders.length};
+  STATE.tenders.forEach(t=>{c[t.div]=(c[t.div]||0)+1;});
+  return c;
+}
+
+/* ═══════════════════════════════════════════════════
+   HTML BUILDERS
+═══════════════════════════════════════════════════ */
+function badgeHtml(t){
+  if(t.dtlF) return`<span class="badge df">DTL FAILED</span>`;
+  if(t.tsl.includes("under eval")) return`<span class="badge ev">UNDER EVAL</span>`;
+  if(t.notAw) return`<span class="badge na">NOT AWARDED</span>`;
+  if(t.payR)  return`<span class="badge cmp">COMPLETE</span>`;
+  if(t.sdl&&!t.payR) return`<span class="badge pp">PAY PENDING</span>`;
+  if(t.pg&&!t.sdl)   return`<span class="badge sp">SUPPLY PEND</span>`;
+  if(t.isAw&&!t.pg)  return`<span class="badge pop">PO AWAITED</span>`;
+  if(t.isAw)  return`<span class="badge awd">AWARDED</span>`;
+  return`<span class="badge bi">BID IN</span>`;
+}
+
+function msHtml(t){
+  const STEPS=[{k:"isAw",lb:"Contract\nAwarded"},{k:"pg",lb:"PO\nIssued"},{k:"sdl",lb:"Supplies\nDelivered"},{k:"dtlD",lb:"DTL\nCleared"},{k:"payR",lb:"Payment\nReceived"}];
+  const steps=STEPS.map(s=>{
+    const done=!!t[s.k], skip=s.k==="isAw"&&t.notAw;
+    const ct=(s.k==="dtlD"&&t.dtlF)||(s.k==="isAw"&&t.isAw&&!t.pg);
+    const fl=(s.k==="payR"&&t.sdl&&!t.payR)||(s.k==="sdl"&&t.pg&&!t.sdl);
+    return{...s,done,skip,ct,fl};
+  });
+  const dn=steps.filter(s=>s.done&&!s.skip).length, pct=Math.round(dn/steps.length*100);
+  const fc=t.dtlF?"var(--red)":pct===100?"var(--green)":pct>50?"var(--teal)":"var(--amber)";
+  let track="";
+  steps.forEach((s,i)=>{
+    const cls=s.skip?"sk":s.ct?"ct":s.fl?"fl":s.done?"dn":"id";
+    const icon=s.skip?"×":(s.ct||s.fl)?"!":s.done?"✓":"·";
+    track+=`<div class="msst"><div class="msd ${cls}">${icon}</div><div class="mslb">${esc(s.lb)}</div></div>`;
+    if(i<steps.length-1) track+=`<div class="mscn ${s.done&&!s.skip?"dn":"id"}"></div>`;
+  });
+  return`<div class="ms"><div class="mstr">${track}</div>
+    <div class="msprog"><div class="msbar"><div class="msfill" style="width:${pct}%;background:${fc}"></div></div>
+    <span class="mspct">${pct}%</span></div></div>`;
+}
+
+function adotsHtml(alerts){
+  const c=alerts.filter(a=>a.s==="c").length, w=alerts.filter(a=>a.s==="w").length;
+  if(!c&&!w)return`<div style="width:18px"></div>`;
+  return`<div class="adts">${c>0?`<div class="adt c" title="${c} critical"></div>`:""}${w>0?`<div class="adt w" title="${w} warning"></div>`:""}</div>`;
+}
+
+function detailHtml(t){
+  const val=t.cv||t.tpv||t.ba;
+  const IR=(l,v)=>isR(v)?`<div class="dr"><span class="dl">${esc(l)}</span><span class="dv">${esc(String(v).slice(0,80))}</span></div>`:"";
+  let alerts="", prods="", remarks="", proc="";
+  if(t.alerts.length>0){
+    let rows="";
+    t.alerts.forEach(a=>{
+      const col=a.s==="c"?"var(--red)":a.s==="w"?"var(--amber)":"var(--t3)";
+      rows+=`<div class="alr"><div class="ald" style="background:${col}"></div><span class="alt ${a.s}">${esc(a.m)}</span></div>`;
+    });
+    alerts=`<div><div class="dtt">Active Alerts</div>${rows}</div>`;
+  }
+  proc=`<div><div class="dtt">Procurement Details</div>
+    ${IR("PO Number",t.pn)}${IR("PO Date",t.pd)}${IR("Supplies Due",t.sd)}
+    ${IR("Delivered On",t.sdd)}${IR("DTL / Test",t.dtlr)}${IR("Payment Terms",t.pt)}
+    ${IR("Payment Exp.",t.pe)}${IR("Payment Rec.",t.pr2)}${IR("LC / BC",t.lc?"Issued":"")}${IR("LC Expiry",t.le)}${IR("Status Note",t.st)}
+    ${val?`<div class="dr"><span class="dl">Contract Value</span><span class="dv hi">PKR ${fP(val)}</span></div>`:""}
+  </div>`;
+  if(t.prods.length>0){
+    let pills="";
+    t.prods.forEach(p=>{
+      pills+=`<div class="pprod"><span>${esc(cl(p.product)||"—")}</span>
+        ${p.qty?`<span class="ppq">× ${esc(String(p.qty).slice(0,12))}</span>`:""}
+        ${p.ur?`<span class="ppq">@ ${esc(p.ur)}</span>`:""}</div>`;
+    });
+    prods=`<div><div class="dtt">Products (${t.prods.length})</div><div style="display:flex;flex-wrap:wrap">${pills}</div></div>`;
+  }
+  if(t.nt||t.rm){
+    remarks=`<div><div class="dtt">Notes & Remarks</div>
+      ${t.nt?`<div style="font-size:11px;color:var(--t2);margin-bottom:4px;line-height:1.5">${esc(t.nt.slice(0,200))}</div>`:""}
+      ${t.rm?`<div style="font-size:11px;color:var(--t3);font-style:italic;line-height:1.5">${esc(t.rm.slice(0,200))}</div>`:""}</div>`;
+  }
+  return`<div class="dp-inner">${alerts}${proc}${prods}${remarks}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN RENDER
+═══════════════════════════════════════════════════ */
+function render(){
+  const app=document.getElementById("app");
+  const {tenders,loadState,err,lastFetch,countdown,activeDiv,activeSt,search,expanded,sortF,sortDir}=STATE;
+
+  if(loadState==="loading"&&tenders.length===0){
+    app.innerHTML=`<div class="center-state"><div class="ci">📡</div>
+      <div class="ct">Connecting to Live Data</div>
+      <div class="cs">Fetching tender data from your Google Sheets across all 3 division tabs…</div>
+      <div class="lbar"><div class="lfill"></div></div></div>`;
+    return;
+  }
+  if(loadState==="error"&&tenders.length===0){
+    app.innerHTML=`<div class="center-state"><div class="ci">⚠️</div>
+      <div class="ct" style="color:var(--red)">Could Not Load Data</div>
+      <div class="cs">Make sure your Google Sheet is published to web (File → Share → Publish to web).<br><br>
+      Error: <code style="background:#FEF2F2;padding:2px 6px;border-radius:4px">${esc(err)}</code></div>
+      <button class="ebtn" onclick="retryFetch()">↻ Try Again</button></div>`;
+    return;
+  }
+
+  const kpis=getKpis();
+  const divC=getDivCounts();
+  const filtered=getFiltered();
+  const DIVS=["All","Hospicare","Critical Care","Medical Care"];
+  const STF_KEYS=["All","🔴 Alerts","Awarded","PO Pending","Supply Pend","Pay Pending","Completed","Not Awarded"];
+  const ldotCls=loadState==="loading"?"spin":"ok";
+
+  /* Division tabs */
+  const tabsHtml=DIVS.map(d=>{
+    const col=DC[d]||"";
+    const dot=d!=="All"?`<div class="ddot" style="background:${col}"></div>`:"";
+    const pillBg=activeDiv===d?"var(--teal-d)":"var(--raised)";
+    const pillCol=activeDiv===d?"var(--teal)":"var(--t3)";
+    return`<button class="dtab ${activeDiv===d?"on":""}" onclick="setDiv('${esc(d)}')">${dot}${esc(d)}
+      <span class="tpill" style="background:${pillBg};color:${pillCol}">${divC[d]||0}</span></button>`;
+  }).join("");
+
+  /* Alert bar */
+  let alertBar="";
+  if(kpis.critC>0||kpis.warnC>0){
+    alertBar=`<div class="abar">
+      ${kpis.critC>0?`<div class="achip c"><span class="pls r"></span><strong>${kpis.critC} Critical</strong> — Tenders requiring immediate escalation</div>`:""}
+      ${kpis.warnC>0?`<div class="achip w"><span class="pls a"></span><strong>${kpis.warnC} Warnings</strong> — Procurement gaps needing follow-up</div>`:""}
+      <button class="alink" onclick="viewAlerts()">View All Alerts →</button>
+    </div>`;
+  }
+
+  /* KPIs */
+  const kRow=`<div class="krow">
+    <div class="kpi teal"><div class="kico">💰</div><div class="kv teal">${kpis.pipe?`PKR ${fP(kpis.pipe)}`:"—"}</div><div class="kl">PIPELINE VALUE</div><div class="ks">${kpis.total} tenders</div></div>
+    <div class="kpi teal"><div class="kico">🏆</div><div class="kv teal">${kpis.awarded}</div><div class="kl">CONTRACTS AWARDED</div><div class="ks">${Math.round(kpis.awarded/Math.max(kpis.total,1)*100)}% win rate</div></div>
+    <div class="kpi amber"><div class="kico">📝</div><div class="kv amber">${kpis.poPend}</div><div class="kl">PO AWAITED</div><div class="ks">Awarded, no PO yet</div></div>
+    <div class="kpi amber"><div class="kico">🚚</div><div class="kv amber">${kpis.supPend}</div><div class="kl">SUPPLY PENDING</div><div class="ks">PO issued, not delivered</div></div>
+    <div class="kpi blue"><div class="kico">💳</div><div class="kv blue">${kpis.payPend}</div><div class="kl">PAYMENT PENDING</div><div class="ks">Delivered, unpaid</div></div>
+    <div class="kpi green"><div class="kico">✅</div><div class="kv green">${kpis.complete}</div><div class="kl">COMPLETED</div><div class="ks">Payment received</div></div>
+  </div>`;
+
+  /* Status filters */
+  const sfHtml=STF_KEYS.map(s=>`<button class="sf ${activeSt===s?"on":""}" onclick="setSt('${esc(s)}')">${esc(s)}</button>`).join("");
+
+  /* Table rows */
+  let rowsHtml="";
+  if(filtered.length===0){
+    rowsHtml=`<tr class="norows"><td colspan="7">No tenders match current filters</td></tr>`;
+  } else {
+    filtered.forEach(t=>{
+      const hc=t.alerts.some(a=>a.s==="c"), hw=t.alerts.some(a=>a.s==="w"), isO=!!expanded[t.id];
+      const dv=t.cv||t.tpv||t.ba;
+      const rowCls=`${hc?"cr":hw?"wa":""} ${isO?"xp":""}`;
+      rowsHtml+=`<tr class="${rowCls}" onclick="toggleRow('${esc(t.id)}')">
+        <td><span class="earr ${isO?"op":""}">▶</span></td>
+        <td><div class="tid"><div class="ddot" style="background:${DC[t.div]||"var(--t3)"}"></div>${esc(t.id)}</div></td>
+        <td><div class="tinst">${esc(t.inst||"—")}</div><div class="tdiv">${esc(t.div)}</div></td>
+        <td>${badgeHtml(t)}</td>
+        <td>${msHtml(t)}</td>
+        <td><div class="tval">${dv?`PKR ${fP(dv)}`:"—"}</div>${t.tpv>0&&t.tpv!==dv?`<div class="tvsub">PO: ${fP(t.tpv)}</div>`:""}</td>
+        <td>${adotsHtml(t.alerts)}</td>
+      </tr>`;
+      if(isO){
+        rowsHtml+=`<tr><td colspan="7" style="padding:0">${detailHtml(t)}</td></tr>`;
+      }
+    });
+  }
+
+  /* Sort indicators */
+  const si=f=>sortF===f?(sortDir==="asc"?"↑":"↓"):"";
+
+  /* Division summary cards */
+  let dcards="";
+  ["Hospicare","Critical Care","Medical Care"].forEach(div=>{
+    const dt=tenders.filter(t=>t.div===div);
+    const aw=dt.filter(t=>t.isAw&&!t.notAw).length, ac=dt.filter(t=>t.pg&&!t.payR).length, al=dt.filter(t=>t.alerts.length>0).length;
+    const val=dt.reduce((s,t)=>s+(t.cv||t.ba||0),0), col=DC[div], rate=Math.round(aw/Math.max(dt.length,1)*100);
+    dcards+=`<div class="dc">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${col};border-radius:10px 10px 0 0"></div>
+      <div class="dcn" style="color:${col}">${esc(div)}</div>
+      <div class="dcc">${dt.length} tenders tracked</div>
+      <div class="dcv" style="color:${col}">${val?`PKR ${fP(val)}`:"—"}</div>
+      <div class="dcvs">total pipeline value</div>
+      <div class="dcst">
+        <div><div class="dcs-v" style="color:${col}">${aw}</div><div class="dcs-l">Awarded</div></div>
+        <div><div class="dcs-v" style="color:var(--blue)">${ac}</div><div class="dcs-l">Active</div></div>
+        <div><div class="dcs-v" style="color:${al>0?"var(--red)":"var(--t3)"}">${al}</div><div class="dcs-l">Alerts</div></div>
+      </div>
+      <div class="dcpb"><div class="dcpf" style="width:${rate}%;background:${col}"></div></div>
+      <div class="dcr">${rate}% award rate</div>
+    </div>`;
+  });
+
+  app.innerHTML=`
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="brand">
+          <div class="brand-logo">🏥</div>
+          <div>
+            <div class="brand-name">IBL Healthcare · MSD Division</div>
+            <div class="brand-sub">TENDER PROGRESSION TRACKER · FY 25–26 · LIVE</div>
+          </div>
+        </div>
+        <div class="live-row">
+          <div class="ldot ${ldotCls}"></div>
+          <span>${loadState==="loading"?"Refreshing…":`Updated: ${fmtT(lastFetch)}`}</span>
+          <span style="color:var(--t3)">|</span>
+          <span>Refresh in <strong id="cd">${fmtC(countdown)}</strong></span>
+          <button class="rfbtn" onclick="manualRefresh()">↻ Now</button>
+        </div>
+      </div>
+      <div class="dtabs">${tabsHtml}</div>
+    </div>
+
+    <!-- ALERT BAR -->
+    ${alertBar}
+
+    <!-- BODY -->
+    <div class="body">
+      ${kRow}
+      <div class="tbar">
+        <input class="srch" placeholder="🔍  Search Tender ID, institution, division…"
+          value="${esc(search)}" oninput="setSearch(this.value)"/>
+        <div class="sfwrap">${sfHtml}</div>
+      </div>
+      <div class="twrap">
+        <div class="tcap">
+          <div class="tcl">SHOWING ${filtered.length} OF ${tenders.length} TENDERS${activeDiv!=="All"?` · ${esc(activeDiv.toUpperCase())}`:""}${activeSt!=="All"?` · ${esc(activeSt.toUpperCase())}`:""}</div>
+          <div class="tcr">Click any row for full detail</div>
+        </div>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr>
+              <th style="width:22px"></th>
+              <th onclick="toggleSort('id')">TENDER ID ${si("id")}</th>
+              <th onclick="toggleSort('inst')">INSTITUTION ${si("inst")}</th>
+              <th>STAGE</th>
+              <th>MILESTONES</th>
+              <th class="r" onclick="toggleSort('cv')">VALUE ${si("cv")}</th>
+              <th class="r" style="width:34px">⚑</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="dcards">${dcards}</div>
+      <div class="footer">IBL HEALTHCARE · MSD DIVISION · TENDER TRACKER FY 25–26 · LIVE FROM GOOGLE SHEETS · AUTO-REFRESH EVERY 5 MIN</div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════
+   EVENT HANDLERS (called from HTML)
+═══════════════════════════════════════════════════ */
+function setDiv(d)   { setState({activeDiv:d}); }
+function setSt(s)    { setState({activeSt:s}); }
+function setSearch(v){ STATE.search=v; render(); }
+function viewAlerts(){ setState({activeSt:"🔴 Alerts",activeDiv:"All"}); }
+function retryFetch(){ fetchAll(); }
+function manualRefresh(){ fetchAll(); setState({countdown:REFRESH_MS/1000}); }
+function toggleSort(f){
+  if(STATE.sortF===f) setState({sortDir:STATE.sortDir==="asc"?"desc":"asc"});
+  else setState({sortF:f,sortDir:"asc"});
+}
+function toggleRow(id){
+  const e={...STATE.expanded};
+  e[id]=!e[id];
+  setState({expanded:e});
+}
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+fetchAll();
+startTimers();
+</script>
+</body>
+</html>
