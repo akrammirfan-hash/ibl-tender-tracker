@@ -227,11 +227,13 @@ td{padding:10px 13px;font-size:12px;color:var(--t1);vertical-align:middle;}
 /* ═══════════════════════════════════════════════════
    CONFIG — Your 3 Google Sheets CSV URLs
 ═══════════════════════════════════════════════════ */
-const SHEETS = [
+const RAW_SHEETS = [
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=1526619916&single=true&output=csv",
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=286795890&single=true&output=csv",
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=634235353&single=true&output=csv"
 ];
+const PROXY = "https://corsproxy.io/?url=";
+const SHEETS = RAW_SHEETS.map(u => PROXY + encodeURIComponent(u));
 const REFRESH_MS = 5 * 60 * 1000;
 const DC = { Hospicare:"#0090A0", "Critical Care":"#1D4ED8", "Medical Care":"#B45309" };
 
@@ -249,7 +251,7 @@ const HDR = {
   "tender id":"id","tenderid":"id","tender name":"nm","tendername":"nm","institution":"inst",
   "bid submitted (y/n)":"bs","bidsubmitted(y/n)":"bs","bid amount":"ba","bidamount":"ba",
   "contract awarded (y/n)":"aw","contractawarded(y/n)":"aw","tenderstatus":"ts","tender status":"ts",
-  "notes":"nt","po number":"pn","po generation date":"pd","supplies due date":"sd","suppliesduedate":"sd",
+  "notes":"nt","po number":"pn","po number (institute po)":"pn","po to principal status":"potp","po generation date":"pd","supplies due date":"sd","suppliesduedate":"sd",
   "supplies delivered (y/n)":"sdl","suppliesdelivered(y/n)":"sdl",
   "suppliesdelivereddate / dn acknowledgement date":"sdd",
   "dtl date  / test opening date":"dtl","dtl date / test opening date":"dtl",
