@@ -232,8 +232,24 @@ const RAW_SHEETS = [
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=286795890&single=true&output=csv",
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZSGVhmMiTojFEDwLGa2qB0T1zUOCh507SCtMvT9_ShaxGubzfW8g56pP9XrcvHhMMiENce-J9L4Au/pub?gid=634235353&single=true&output=csv"
 ];
-const PROXY = "https://corsproxy.io/?url=";
-const SHEETS = RAW_SHEETS.map(u => PROXY + encodeURIComponent(u));
+const PROXIES = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+];
+async function fetchWithFallback(rawUrl) {
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const proxyUrl = PROXIES[i](rawUrl);
+      const r = await fetch(proxyUrl, {signal: AbortSignal.timeout(10000)});
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const text = await r.text();
+      if (text && text.length > 50) return text;
+    } catch(e) {
+      if (i === PROXIES.length - 1) throw new Error("All proxies failed: " + e.message);
+    }
+  }
+}
 const REFRESH_MS = 5 * 60 * 1000;
 const DC = { Hospicare:"#0090A0", "Critical Care":"#1D4ED8", "Medical Care":"#B45309" };
 
@@ -340,15 +356,15 @@ function setState(patch){
 async function fetchAll(){
   if(STATE.loadState!=="ready") setState({loadState:"loading"});
   try{
-    const results = await Promise.all(SHEETS.map(url =>
-      fetch(url)
-        .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
-        .then(csv=>{ const p=Papa.parse(csv,{skipEmptyLines:true}); return parseRows(p.data); })
-    ));
+    const results = await Promise.all(RAW_SHEETS.map(async url => {
+      const csv = await fetchWithFallback(url);
+      const p = Papa.parse(csv, {skipEmptyLines:true});
+      return parseRows(p.data);
+    }));
     const all = results.flat();
     setState({tenders:all, loadState:"ready", lastFetch:new Date(), countdown:REFRESH_MS/1000});
   } catch(e){
-    setState({err:e.message||"Network error", loadState: STATE.tenders.length>0?"ready":"error"});
+    setState({err:e.message||"Network error — check your internet connection or try again", loadState: STATE.tenders.length>0?"ready":"error"});
   }
 }
 
