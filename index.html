@@ -397,8 +397,25 @@ const RAW_SHEETS = [
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfGtrI5j3hdDCDzMOf4RxX82vNDEOr67kAOA6n_G1Hnq31PgTDc8cpKPnVccetvg/pub?gid=609187936&single=true&output=csv",
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfGtrI5j3hdDCDzMOf4RxX82vNDEOr67kAOA6n_G1Hnq31PgTDc8cpKPnVccetvg/pub?gid=1142945168&single=true&output=csv"
 ];
-const PROXY       = "https://corsproxy.io/?url=";
-const SHEETS      = RAW_SHEETS.map(u => PROXY + encodeURIComponent(u));
+const PROXIES = [
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+async function fetchWithFallback(rawUrl) {
+  for (const proxy of PROXIES) {
+    try {
+      const url = proxy(rawUrl);
+      const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
+      if (r.ok) {
+        const text = await r.text();
+        if (text && text.length > 20 && text.includes(",")) return text;
+      }
+    } catch(e) { /* try next */ }
+  }
+  throw new Error("Could not reach Google Sheets — ensure sheet is published to web as CSV");
+}
 const REFRESH_MS  = 5 * 60 * 1000;
 const DC          = { Hospicare:"#0085A3", "Critical Care":"#1D4ED8", "Medical Care":"#B45309" };
 
@@ -602,11 +619,11 @@ function setState(p){ S={...S,...p}; render(); }
 async function fetchAll(){
   if(S.state!=="ready") setState({state:"loading"});
   try{
-    const results=await Promise.all(SHEETS.map(url=>
-      fetch(url)
-        .then(r=>{ if(!r.ok)throw new Error(`HTTP ${r.status}`); return r.text(); })
-        .then(csv=>{ const p=Papa.parse(csv,{skipEmptyLines:true}); return parseRows(p.data); })
-    ));
+    const results=await Promise.all(RAW_SHEETS.map(async rawUrl=>{
+      const text = await fetchWithFallback(rawUrl);
+      const p=Papa.parse(text,{skipEmptyLines:true});
+      return parseRows(p.data);
+    }));
     const all=results.flat();
     setState({tenders:all,state:"ready",lastFetch:new Date(),cd:REFRESH_MS/1000});
   }catch(e){
